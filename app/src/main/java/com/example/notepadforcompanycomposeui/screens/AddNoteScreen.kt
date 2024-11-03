@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -49,6 +51,14 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.Alignment
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddNoteScreen(
@@ -72,73 +82,82 @@ fun AddNoteScreen(
     var currentLocation by remember { mutableStateOf<Location?>(null) }
     var isLocationPermissionGranted by remember { mutableStateOf(false) }
     var isGPSEnabled by remember { mutableStateOf(false) }
+    var showLocationRetryButton by remember { mutableStateOf(false) }
+    var showPermissionRetryButton by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val activity = LocalContext.current as Activity
     val locationHandler = rememberLocationHandler(context)
     val scrollState = rememberScrollState()
 
-    // Function to save note with current location
-    val saveNote = {
-        if (companyName.isEmpty() || phoneNumber.isEmpty() || location.isEmpty()) {
-            showErrors = true
-        } else {
-            val note = NotesByDateEntity(
-                noteId = noteId ?: System.currentTimeMillis(),
-                dateId = dateId,
-                noteText = noteText,
-                phoneNumber = phoneNumber,
-                companyName = companyName,
-                email = email,
-                location = location,
-                additionalInfo = additionalInfo,
-                followUp = followUp,
-                interestRate = interestRate,
-                latitude = currentLocation?.latitude ?: 0.0,
-                longitude = currentLocation?.longitude ?: 0.0,
-                isUploaded = isUploaded
-            )
+    // Location update job reference
+    var locationUpdateJob by remember { mutableStateOf<Job?>(null) }
 
-            if (noteId != null) {
-                viewModel.updateNote(note)
-            } else {
-                viewModel.insertNote(note)
-            }
-            onNavigateBack()
-        }
-    }
-
-    // Handle automatic location updates
-    LaunchedEffect(Unit) {
-        if (noteId == null) {  // Only for new notes
-            locationHandler.checkLocationPermission().let { hasPermission ->
-                isLocationPermissionGranted = hasPermission
-                if (hasPermission) {
-                    locationHandler.turnOnGPS(
-                        activity = activity,
-                        onSuccess = {
-                            isGPSEnabled = true
-                            // Launch a coroutine to continuously update location
-                            CoroutineScope(Dispatchers.Main).launch {
-                                while (true) {
-                                    locationHandler.getCurrentLocation()?.let { location ->
-                                        currentLocation = location
-                                    }
-                                    delay(30000) // Update every 30 seconds
-                                }
-                            }
-                        },
-                        onFailure = {
-                            isGPSEnabled = false
-                            Toast.makeText(context, "GPS is required for accurate location", Toast.LENGTH_SHORT).show()
-                        }
-                    )
+    // Function to start location updates
+    val startLocationUpdates = {
+        locationUpdateJob?.cancel()
+        locationUpdateJob = CoroutineScope(Dispatchers.Main).launch {
+            while (isActive) {
+                locationHandler.getCurrentLocation()?.let { location ->
+                    currentLocation = location
+                    showLocationRetryButton = false
+                } ?: run {
+                    showLocationRetryButton = true
                 }
+                delay(5000) // Update every 3 seconds
             }
         }
     }
 
-    // Load existing note data if editing
+    // Function to handle GPS enable request
+    val handleGPSEnable = {
+        locationHandler.turnOnGPS(
+            activity = activity,
+            onSuccess = {
+                isGPSEnabled = true
+                showLocationRetryButton = false
+                startLocationUpdates()
+            },
+            onFailure = {
+                isGPSEnabled = false
+                showLocationRetryButton = true
+                Toast.makeText(context, "GPS is required for accurate location", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        isLocationPermissionGranted = isGranted
+        if (isGranted) {
+            showPermissionRetryButton = false
+            handleGPSEnable()
+        } else {
+            showPermissionRetryButton = true
+            Toast.makeText(context, "Allow location permission", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Function to request location permission
+    val requestLocationPermission = {
+        permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+    // Initial setup for new notes
+    LaunchedEffect(Unit) {
+        if (noteId == null) {
+            if (locationHandler.checkLocationPermission()) {
+                isLocationPermissionGranted = true
+                handleGPSEnable()
+            } else {
+                requestLocationPermission()
+            }
+        }
+    }
+
+    // Load existing note data
     LaunchedEffect(noteId) {
         if (noteId != null) {
             viewModel.getNoteById(noteId)?.let { note ->
@@ -153,39 +172,19 @@ fun AddNoteScreen(
                 currentLocation = Location("").apply {
                     latitude = note.latitude
                     longitude = note.longitude
+                    Toast.makeText(context, "${note.longitude + note.latitude}", Toast.LENGTH_SHORT).show()
                 }
+
                 isUploaded = note.isUploaded
             }
         }
     }
 
-    // Request location permission for new notes
-    if (noteId == null && !isLocationPermissionGranted) {
-        LocationPermissionHandler(
-            onPermissionGranted = {
-                isLocationPermissionGranted = true
-                // Trigger GPS check after permission is granted
-                locationHandler.turnOnGPS(
-                    activity = activity,
-                    onSuccess = {
-                        isGPSEnabled = true
-                        CoroutineScope(Dispatchers.Main).launch {
-                            locationHandler.getCurrentLocation()?.let { location ->
-                                currentLocation = location
-                            }
-                        }
-                    },
-                    onFailure = {
-                        isGPSEnabled = false
-                        Toast.makeText(context, "GPS is required for accurate location", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            },
-            onPermissionDenied = {
-                isLocationPermissionGranted = false
-                Toast.makeText(context, "Location permission is required", Toast.LENGTH_SHORT).show()
-            }
-        )
+    // Cleanup location updates when leaving the screen
+    DisposableEffect(Unit) {
+        onDispose {
+            locationUpdateJob?.cancel()
+        }
     }
 
     Scaffold(
@@ -217,102 +216,170 @@ fun AddNoteScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Show location status
-            if (noteId == null && (!isLocationPermissionGranted || !isGPSEnabled)) {
+            // Location status and retry buttons
+            if (noteId == null) {
+                when {
+                    !isLocationPermissionGranted && showPermissionRetryButton -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Location permission required",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            TextButton(onClick = requestLocationPermission) {
+                                Text("Grant Permission")
+                            }
+                        }
+                    }
+                    isLocationPermissionGranted && !isGPSEnabled && !showLocationRetryButton -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "GPS is disabled",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            TextButton(onClick = handleGPSEnable) {
+                                Text("Enable GPS")
+                            }
+                        }
+                    }
+                    isLocationPermissionGranted && isGPSEnabled && showLocationRetryButton -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Unable to get location",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            TextButton(onClick = startLocationUpdates) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Error message for required fields
+            if (showErrors && (companyName.isEmpty() || phoneNumber.isEmpty() || location.isEmpty())) {
                 Text(
-                    text = when {
-                        !isLocationPermissionGranted -> "Location permission required for accurate location"
-                        !isGPSEnabled -> "Please enable GPS for accurate location"
-                        else -> ""
-                    },
+                    text = "Please fill in all required fields",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-               /* // Error message if the form is submitted with missing required fields
-                if (showErrors && (companyName.isEmpty() || phoneNumber.isEmpty() || location.isEmpty())) {
-                    Text(
-                        text = "Please fill in all required fields",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }*/
 
-                OutlinedTextField(
-                    value = companyName,
-                    onValueChange = { companyName = it },
-                    label = { Text("Company Name*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = showErrors && companyName.isEmpty()
-                )
+            OutlinedTextField(
+                value = companyName,
+                onValueChange = { companyName = it },
+                label = { Text("Company Name*") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = showErrors && companyName.isEmpty()
+            )
 
-                OutlinedTextField(
-                    value = phoneNumber,
-                    onValueChange = { phoneNumber = it },
-                    label = { Text("Phone Number*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    isError = showErrors && phoneNumber.isEmpty()
-                )
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it },
+                label = { Text("Phone Number*") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    keyboardType = KeyboardType.Number
+                ),
+                isError = showErrors && phoneNumber.isEmpty()
+            )
 
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("Location*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = showErrors && location.isEmpty()
-                )
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it },
+                label = { Text("Location*") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = showErrors && location.isEmpty()
+            )
 
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                modifier = Modifier.fillMaxWidth()
+            )
 
 
 
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = { noteText = it },
-                    label = { Text("Notes") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it },
+                label = { Text("Notes") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3
+            )
 
-                OutlinedTextField(
-                    value = followUp,
-                    onValueChange = { followUp = it },
-                    label = { Text("Follow-up") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            OutlinedTextField(
+                value = followUp,
+                onValueChange = { followUp = it },
+                label = { Text("Follow-up") },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                OutlinedTextField(
-                    value = interestRate,
-                    onValueChange = { interestRate = it },
-                    label = { Text("Interest Rate") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            OutlinedTextField(
+                value = interestRate,
+                onValueChange = { interestRate = it },
+                label = { Text("Interest Rate") },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                OutlinedTextField(
-                    value = additionalInfo,
-                    onValueChange = { additionalInfo = it },
-                    label = { Text("Additional Info") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
-                )
+            OutlinedTextField(
+                value = additionalInfo,
+                onValueChange = { additionalInfo = it },
+                label = { Text("Additional Info") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2
+            )
 
-                // Save Button at the end of the scrollable content
-                Button(
-                    onClick = saveNote,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                ) {
-                    Text(if (noteId != null) "Update" else "Save")
-                }
+            Button(
+                onClick = {
+                    if (companyName.isEmpty() || phoneNumber.isEmpty() || location.isEmpty()) {
+                        showErrors = true
+                    } else {
+                        val note = NotesByDateEntity(
+                            noteId = noteId ?: System.currentTimeMillis(),
+                            dateId = dateId,
+                            noteText = noteText,
+                            phoneNumber = phoneNumber,
+                            companyName = companyName,
+                            email = email,
+                            location = location,
+                            additionalInfo = additionalInfo,
+                            followUp = followUp,
+                            interestRate = interestRate,
+                            latitude = currentLocation?.latitude ?: 0.0,
+                            longitude = currentLocation?.longitude ?: 0.0,
+                            isUploaded = isUploaded
+                        )
+
+                        if (noteId != null) {
+                            viewModel.updateNote(note)
+                        } else {
+                            viewModel.insertNote(note)
+                        }
+                        onNavigateBack()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                Text(if (noteId != null) "Update" else "Save")
             }
         }
     }
+}
