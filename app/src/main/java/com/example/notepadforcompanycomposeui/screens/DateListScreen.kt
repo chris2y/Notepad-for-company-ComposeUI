@@ -1,6 +1,7 @@
 package com.example.notepadforcompanycomposeui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import java.util.*
 
 @Composable
 fun DateListScreen(
+    onDateClick: (Long) -> Unit,
     viewModel: NotesViewModel = hiltViewModel()
 ) {
     val dates by viewModel.dates.collectAsState()
@@ -74,11 +76,14 @@ fun DateListScreen(
                     )
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(dates) { date ->
-                            DateItem(date)
+                            DateItem(
+                                date = date,
+                                onDateClick = onDateClick
+                            )
                         }
                     }
                 }
@@ -88,11 +93,14 @@ fun DateListScreen(
 }
 
 @Composable
-private fun DateItem(date: DateEntity) {
+private fun DateItem(
+    date: DateEntity,
+    onDateClick: (Long) -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp),
+            .clickable { onDateClick(date.currentTimeMillis) },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant

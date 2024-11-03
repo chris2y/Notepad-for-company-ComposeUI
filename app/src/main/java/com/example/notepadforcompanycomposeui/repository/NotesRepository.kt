@@ -25,6 +25,11 @@ class NotesRepository @Inject constructor(
         notesByDateDao.update(note)
     }
 
+    // Add this new method
+    suspend fun getNoteById(noteId: Long): NotesByDateEntity {
+        return notesByDateDao.getNoteById(noteId)
+    }
+
 
 
     suspend fun insertFirebaseLocation(location: FirebaseEntity) {

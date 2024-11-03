@@ -30,6 +30,16 @@ class NotesViewModel @Inject constructor(
         }
     }
 
+    suspend fun getNoteById(noteId: Long): NotesByDateEntity? {
+        return repository.getNoteById(noteId)
+    }
+
+    fun updateNote(note: NotesByDateEntity) {
+        viewModelScope.launch {
+            repository.updateNote(note)
+            loadNotesByDateId(note.dateId)
+        }
+    }
     fun insertDate(date: DateEntity) {
         viewModelScope.launch {
             repository.insertDate(date)

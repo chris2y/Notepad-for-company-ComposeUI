@@ -15,5 +15,9 @@ data class NotesByDateEntity(
     var location: String,
     var additionalInfo: String,
     var followUp: String,
-    var interestRate: String
+    var interestRate: String,
+    var latitude: Double,
+    var longitude: Double,
+    var isUploaded: Boolean
+
 )

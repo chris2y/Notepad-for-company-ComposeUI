@@ -13,7 +13,7 @@ import com.example.notepadforcompanycomposeui.data.entities.NotesByDateEntity
 
 @Database(
     entities = [DateEntity::class, NotesByDateEntity::class, FirebaseEntity::class],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

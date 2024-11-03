@@ -8,7 +8,7 @@ import com.example.notepadforcompanycomposeui.data.entities.NotesByDateEntity
 
 @Dao
 interface NotesByDateDao {
-    @Query("SELECT * FROM notes_by_date WHERE dateId = :dateId")
+    @Query("SELECT * FROM notes_by_date WHERE dateId = :dateId ORDER BY noteId DESC")
     suspend fun getNotesByDateId(dateId: Long): List<NotesByDateEntity>
 
     @Insert
