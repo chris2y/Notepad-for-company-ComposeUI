@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt)
     kotlin("kapt")
+    alias(libs.plugins.google.gms.google.services)
 
 }
 
@@ -63,6 +64,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.preference.ktx)
+    implementation(libs.firebase.firestore)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -77,10 +79,6 @@ dependencies {
 
     // Room Database
     implementation (libs.androidx.room.runtime)
-    kapt(libs.androidx.room.compiler)
-
-    // Room Database
-    implementation(libs.androidx.room.runtime)
     kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     // Add this line
@@ -102,6 +100,14 @@ dependencies {
 
     // Location Services
     implementation(libs.play.services.location)
+
+    //extended icons
+    implementation (libs.androidx.material.icons.extended)
+
+    //splash screen
+    implementation (libs.androidx.core.splashscreen)
+
+
 
 
 

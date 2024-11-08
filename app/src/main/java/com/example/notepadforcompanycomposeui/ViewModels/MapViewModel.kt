@@ -2,6 +2,8 @@ package com.example.notepadforcompanycomposeui.ViewModels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
+import com.example.notepadforcompanycomposeui.data.entities.FirebaseEntity
 import com.example.notepadforcompanycomposeui.repository.LocationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,20 @@ class MapViewModel @Inject constructor(
 
     private var locationRetryCount = 0
     private val maxRetries = 3
+
+    private val _uploadedNotes = MutableStateFlow<List<UploadedNote>>(emptyList())
+    val uploadedNotes = _uploadedNotes.asStateFlow()
+
+    fun getUploadedNotes() {
+        viewModelScope.launch {
+            try {
+                val notes = locationRepository.getUploadedNotes()
+                _uploadedNotes.value = notes
+            } catch (e: Exception) {
+                _locationError.value = "Failed to fetch uploaded notes: ${e.message}"
+            }
+        }
+    }
 
     fun getLastLocation() {
         viewModelScope.launch {

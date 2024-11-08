@@ -36,10 +36,6 @@ class NotesRepository @Inject constructor(
         firebaseDao.insert(location)
     }
 
-    suspend fun getUnsyncedLocations(): List<FirebaseEntity> {
-        return firebaseDao.getUnsynced()
-    }
-
 
     suspend fun getAllDates(): List<DateEntity> {
         return dateDao.getAllDates()

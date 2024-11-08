@@ -6,10 +6,13 @@ import com.example.notepadforcompanycomposeui.data.entities.DateEntity
 import com.example.notepadforcompanycomposeui.data.entities.FirebaseEntity
 import com.example.notepadforcompanycomposeui.data.entities.NotesByDateEntity
 import com.example.notepadforcompanycomposeui.repository.NotesRepository
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -124,5 +127,54 @@ class NotesViewModel @Inject constructor(
 
     init {
         loadSavedDates()
+    }
+
+
+    private val firestore = FirebaseFirestore.getInstance()
+    private val _uploadingNotes = MutableStateFlow<Set<Long>>(emptySet())
+    val uploadingNotes: StateFlow<Set<Long>> = _uploadingNotes
+
+    fun uploadNoteToFirestore(note: NotesByDateEntity) {
+        viewModelScope.launch {
+            try {
+                // Add note ID to uploading set
+                _uploadingNotes.value = _uploadingNotes.value + note.noteId
+
+                // Convert note to HashMap for Firestore
+                val noteMap = hashMapOf(
+                    "noteId" to note.noteId,
+                    "dateId" to note.dateId,
+                    "noteText" to note.noteText,
+                    "phoneNumber" to note.phoneNumber,
+                    "companyName" to note.companyName,
+                    "email" to note.email,
+                    "location" to note.location,
+                    "additionalInfo" to note.additionalInfo,
+                    "followUp" to note.followUp,
+                    "interestRate" to note.interestRate,
+                    "latitude" to note.latitude,
+                    "longitude" to note.longitude,
+                    "timestamp" to FieldValue.serverTimestamp()
+                )
+
+                // Upload to Firestore
+                firestore.collection("notes")
+                    .document(note.noteId.toString())
+                    .set(noteMap)
+                    .await()
+
+                // Update local database
+                val updatedNote = note.copy(isUploaded = true)
+                repository.updateNote(updatedNote)
+
+                // Refresh notes list
+                loadNotesByDateId(note.dateId)
+            } catch (e: Exception) {
+                _showToast.value = "Upload failed: ${e.message}"
+            } finally {
+                // Remove note ID from uploading set
+                _uploadingNotes.value = _uploadingNotes.value - note.noteId
+            }
+        }
     }
 }

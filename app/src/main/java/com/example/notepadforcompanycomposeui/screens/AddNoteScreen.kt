@@ -1,63 +1,61 @@
 package com.example.notepadforcompanycomposeui.screens
 
+
 import android.Manifest
 import android.app.Activity
-import android.content.Context
-import android.content.pm.PackageManager
 import android.location.Location
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.notepadforcompanycomposeui.ViewModels.NotesViewModel
 import com.example.notepadforcompanycomposeui.data.entities.NotesByDateEntity
-import java.util.UUID
-
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.*
-import androidx.compose.ui.text.input.KeyboardType
-
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-
-
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import com.example.notepadforcompanycomposeui.util.LocationPermissionHandler
 import com.example.notepadforcompanycomposeui.util.rememberLocationHandler
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-
-
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
-
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.Alignment
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +75,9 @@ fun AddNoteScreen(
     var interestRate by remember { mutableStateOf("") }
     var isUploaded by remember { mutableStateOf(false) }
     var showErrors by remember { mutableStateOf(false) }
+
+    val uploadingNotes by viewModel.uploadingNotes.collectAsState()
+
 
     // Location states
     var currentLocation by remember { mutableStateOf<Location?>(null) }
@@ -345,11 +346,16 @@ fun AddNoteScreen(
                 minLines = 2
             )
 
+            // Inside AddNoteScreen, modify the Button's onClick:
+
+
+
             Button(
                 onClick = {
                     if (companyName.isEmpty() || phoneNumber.isEmpty() || location.isEmpty()) {
                         showErrors = true
-                    } else {
+                    }
+                    else {
                         val note = NotesByDateEntity(
                             noteId = noteId ?: System.currentTimeMillis(),
                             dateId = dateId,
@@ -368,10 +374,18 @@ fun AddNoteScreen(
 
                         if (noteId != null) {
                             viewModel.updateNote(note)
+                            onNavigateBack()
                         } else {
-                            viewModel.insertNote(note)
+                            if(!isGPSEnabled){
+                                Toast.makeText(context,"Location not found",Toast.LENGTH_SHORT).show()
+                            }
+                            else{
+                                viewModel.insertNote(note)
+                                onNavigateBack()
+                            }
+
                         }
-                        onNavigateBack()
+
                     }
                 },
                 modifier = Modifier

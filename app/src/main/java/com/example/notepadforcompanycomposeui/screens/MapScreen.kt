@@ -49,7 +49,11 @@ import android.graphics.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.graphics.toArgb
+import com.example.notepadforcompanycomposeui.R
+import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 
 @Composable
 fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
@@ -65,11 +69,19 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
     var lastCenterLat by rememberSaveable { mutableStateOf(9.145) }
     var lastCenterLon by rememberSaveable { mutableStateOf(40.489673) }
 
+    var selectedNote by remember { mutableStateOf<UploadedNote?>(null) }
+
+    val uploadedNotes by viewModel.uploadedNotes.collectAsState()
+
+
+
+
     // Initialize map configuration
     Configuration.getInstance().load(
         context,
         androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
     )
+
 
     class InvertedTilesOverlay(mapView: MapView, context: Context) : TilesOverlay(mapView.tileProvider, context) {
         private val paint = Paint()
@@ -228,6 +240,42 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         mapView.invalidate()
     }
 
+    LaunchedEffect(uploadedNotes) {
+        // Clear previous overlays (existing markers)
+        //mapView.overlays.clear()
+
+        uploadedNotes.forEach { note ->
+            // Create a marker with custom settings
+            val marker = Marker(mapView).apply {
+                position = GeoPoint(note.latitude, note.longitude)
+                title = note.companyName
+                snippet = "Contact: ${note.phoneNumber}\nLocation: ${note.location}"
+
+                // Set custom icon for the marker
+                icon = AppCompatResources.getDrawable(mapView.context, R.drawable.campany)
+
+                /*if (isDarkTheme) {
+                    // Tint the marker icon for dark mode
+                    icon?.setTint(android.graphics.Color.WHITE)
+                }*/
+
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM) // Position icon's anchor at bottom center
+            }
+
+            // Set up an info window to display additional details
+            marker.setOnMarkerClickListener { marker, mapView ->
+                selectedNote = note // Set the selected note to show in the dialog
+                true
+            }
+
+            mapView.overlays.add(marker)
+        }
+
+        // Refresh map to show new markers
+        mapView.invalidate()
+    }
+
+
     // Save map state when it changes
     DisposableEffect(mapView) {
         val mapListener = object : MapListener {
@@ -276,12 +324,30 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
 
     LaunchedEffect(Unit) {
         viewModel.getLastLocation()
+        viewModel.getUploadedNotes()
     }
 
     AndroidView(
         factory = { mapView },
         modifier = Modifier.fillMaxSize()
     ) { mv ->
+
+
+        /*viewModel.uploadedNotes.value.forEach { note ->
+            Marker(mv).apply {
+                position = GeoPoint(note.latitude, note.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = note.companyName
+                snippet = "Phone: ${note.phoneNumber}\nLocation: ${note.location}"
+                icon = context.getDrawable(org.osmdroid.library.R.drawable.ic_menu_compass)
+                mv.overlays.add(this)
+                setOnMarkerClickListener { _, _ ->
+                    selectedNote = note // Set the selected note to show in the dialog
+                    true
+                }
+            }
+        }*/
+
         // Only zoom to user location if it's the first time and we have a location
         if (!hasZoomedToUser && userLocation != null) {
             userLocation.let { location ->
@@ -298,15 +364,15 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
 
         // Always update the location marker
         if (userLocation != null) {
-            mv.overlays.clear()
+            //mv.overlays.clear()
             Marker(mv).apply {
                 position = userLocation
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 title = "Your location"
-                icon = context.getDrawable(org.osmdroid.library.R.drawable.ic_menu_mylocation)
+                icon = context.getDrawable(R.drawable.my_location)
                 if (isDarkTheme) {
                     // Tint the marker icon for dark mode
-                    icon?.setTint(android.graphics.Color.WHITE)
+                    //icon?.setTint(android.graphics.Color.WHITE)
                 }
                 mv.overlays.add(this)
             }
@@ -322,6 +388,12 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         )
     }
 
+    selectedNote?.let { note ->
+        ShowNoteDetailsDialog(note) {
+            selectedNote = null // Hide the dialog when dismissed
+        }
+    }
+
     // Error dialog
     if (locationError != null) {
         RetryLocationDialog(
@@ -333,6 +405,19 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
     }
 }
 
+@Composable
+fun ShowNoteDetailsDialog(note: UploadedNote, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(note.companyName) },
+        text = { Text("Phone: ${note.phoneNumber}\nLocation: ${note.location}") },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Okay")
+            }
+        }
+    )
+}
 @Composable
 private fun RetryLocationDialog(
     error: String,
@@ -346,7 +431,10 @@ private fun RetryLocationDialog(
         text = { Text(error) },
         confirmButton = {
             Button(
-                onClick = onRetry,
+                onClick = {
+                    onRetry()
+                    //FirebaseCrashlytics.getInstance().log("Location fetch retry attempted")
+                },
                 enabled = !isLoading
             ) {
                 if (isLoading) {
@@ -360,7 +448,10 @@ private fun RetryLocationDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = {
+                onDismiss()
+                //FirebaseCrashlytics.getInstance().log("Location error dialog dismissed")
+            }) {
                 Text("Dismiss")
             }
         }

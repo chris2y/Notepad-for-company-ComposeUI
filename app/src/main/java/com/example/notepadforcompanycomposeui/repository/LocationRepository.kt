@@ -3,12 +3,17 @@ package com.example.notepadforcompanycomposeui.repository
 import android.content.Context
 import android.location.Location
 import android.os.Looper
+import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 import com.google.android.gms.location.*
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.osmdroid.tileprovider.cachemanager.CacheManager
 import org.osmdroid.views.MapView
 import java.io.File
@@ -147,6 +152,51 @@ class LocationRepository @Inject constructor(
             cacheManager?.cancelAllJobs()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private val firestore = FirebaseFirestore.getInstance()
+    suspend fun getUploadedNotes(): List<UploadedNote> {
+        return withContext(Dispatchers.IO) {
+            val notes = mutableListOf<UploadedNote>()
+            val snapshot = firestore.collection("notes")
+                .get()
+                .await()
+
+            for (document in snapshot.documents) {
+                val noteId = document.getLong("noteId") ?: 0L
+                val dateId = document.getLong("dateId") ?: 0L
+                val noteText = document.getString("noteText") ?: ""
+                val phoneNumber = document.getString("phoneNumber") ?: ""
+                val companyName = document.getString("companyName") ?: ""
+                val email = document.getString("email") ?: ""
+                val location = document.getString("location") ?: ""
+                val additionalInfo = document.getString("additionalInfo") ?: ""
+                val followUp = document.getString("followUp") ?: ""
+                val interestRate = document.getString("interestRate") ?: ""
+                val latitude = document.getDouble("latitude") ?: 0.0
+                val longitude = document.getDouble("longitude") ?: 0.0
+
+                val note = UploadedNote(
+                    noteId = noteId,
+                    dateId = dateId,
+                    noteText = noteText,
+                    phoneNumber = phoneNumber,
+                    companyName = companyName,
+                    email = email,
+                    location = location,
+                    additionalInfo = additionalInfo,
+                    followUp = followUp,
+                    interestRate = interestRate,
+                    latitude = latitude,
+                    longitude = longitude
+                )
+                notes.add(note)
+
+                // Log the fetched note
+                println("Fetched note: $note")
+            }
+            notes
         }
     }
 }

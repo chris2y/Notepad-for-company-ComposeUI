@@ -35,6 +35,7 @@ import android.content.pm.PackageManager
 import androidx.compose.material.icons.filled.Add
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.notepadforcompanycomposeui.screens.AddNoteScreen
@@ -56,6 +57,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestLocationPermissions()
+        actionBar?.hide()
+        val installSplash= installSplashScreen()
         setContent {
             NotepadForCompanyComposeUITheme {
                 MainScreen()
