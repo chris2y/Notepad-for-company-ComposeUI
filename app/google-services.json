@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "307610309375",
+    "project_id": "go-notepad",
+    "storage_bucket": "go-notepad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:307610309375:android:df87ed341c110d8401f2ca",
+        "android_client_info": {
+          "package_name": "com.example.gonotepad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTf6j5HAG-jm1iYsjbTqpUoUH21cBlIxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:307610309375:android:0c3d118703a45ca701f2ca",
+        "android_client_info": {
+          "package_name": "com.example.gonotepadkotlin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTf6j5HAG-jm1iYsjbTqpUoUH21cBlIxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:307610309375:android:d9d87df629c2799f01f2ca",
+        "android_client_info": {
+          "package_name": "com.example.notepadforcompanycomposeui"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTf6j5HAG-jm1iYsjbTqpUoUH21cBlIxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
