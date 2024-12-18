@@ -50,8 +50,21 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
 import com.example.notepadforcompanycomposeui.R
 import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 
@@ -352,7 +365,7 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         if (!hasZoomedToUser && userLocation != null) {
             userLocation.let { location ->
                 mv.controller.apply {
-                    setZoom(6.0)
+                    setZoom(14.0)
                     setCenter(location)
                 }
                 hasZoomedToUser = true
@@ -407,17 +420,66 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
 
 @Composable
 fun ShowNoteDetailsDialog(note: UploadedNote, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(note.companyName) },
-        text = { Text("Phone: ${note.phoneNumber}\nLocation: ${note.location}") },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Okay")
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .padding(16.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Title
+                Text(
+                    text = note.companyName,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Divider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                    thickness = 1.dp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Details
+                Text(
+                    text = "Phone: ${note.phoneNumber}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                Text(
+                    text = "Location: ${note.location}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Button
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                    )
+                ) {
+                    Text("Okay", color = MaterialTheme.colorScheme.onPrimary)
+                }
+
             }
         }
-    )
+    }
 }
+
 @Composable
 private fun RetryLocationDialog(
     error: String,

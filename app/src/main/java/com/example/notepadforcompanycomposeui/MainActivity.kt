@@ -41,6 +41,9 @@ import androidx.navigation.navArgument
 import com.example.notepadforcompanycomposeui.screens.AddNoteScreen
 import com.example.notepadforcompanycomposeui.screens.DateListScreen
 import com.example.notepadforcompanycomposeui.screens.NotesScreen
+import com.example.notepadforcompanycomposeui.ui.navigation.BottomNavBar
+import com.example.notepadforcompanycomposeui.ui.navigation.NavGraph
+import com.example.notepadforcompanycomposeui.ui.navigation.Screen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -85,10 +88,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
-    val items = listOf(
-        Screen.Home,
-        Screen.Map
-    )
+    val items = listOf(Screen.Home, Screen.Map)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -96,91 +96,13 @@ fun MainScreen() {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
-            // Show the bottom bar only on the Home and Map screens
             if (currentRoute == Screen.Home.route || currentRoute == Screen.Map.route) {
-                NavigationBar {
-                    items.forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = null) },
-                            label = { Text(screen.route) },
-                            selected = currentRoute == screen.route,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        )
-                    }
-                }
+                BottomNavBar(navController = navController, items = items)
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.Home.route) {
-                DateListScreen(
-                    onDateClick = { dateId ->
-                        navController.navigate(Screen.Notes.createRoute(dateId))
-                    }
-                )
-            }
-            composable(
-                route = Screen.Notes.route,
-                arguments = listOf(navArgument("dateId") { type = NavType.LongType })
-            ) { backStackEntry ->
-                val dateId = backStackEntry.arguments?.getLong("dateId") ?: return@composable
-                NotesScreen(
-                    dateId = dateId,
-                    onNavigateBack = { navController.popBackStack() },
-                    onAddNoteClick = { dateId ->
-                        navController.navigate(Screen.AddNote.createRoute(dateId))
-                    },
-                    onEditNoteClick = { dateId, noteId ->
-                        navController.navigate(Screen.AddNote.createRoute(dateId, noteId))
-                    }
-                )
-            }
-            composable(
-                route = Screen.AddNote.route,
-                arguments = listOf(
-                    navArgument("dateId") { type = NavType.LongType },
-                    navArgument("noteId") {
-                        type = NavType.LongType
-                        defaultValue = -1L
-                    }
-                )
-            ) { backStackEntry ->
-                val dateId = backStackEntry.arguments?.getLong("dateId") ?: return@composable
-                val noteId = backStackEntry.arguments?.getLong("noteId")?.takeIf { it != -1L }
-                AddNoteScreen(
-                    dateId = dateId,
-                    noteId = noteId,
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-            composable(Screen.Map.route) { MapScreen() }
-        }
+        NavGraph(navController = navController, modifier = Modifier.padding(innerPadding))
     }
 }
 
 
-
-sealed class Screen(val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    object Home : Screen("Home", Icons.Filled.Home)
-    object Map : Screen("Map", Icons.Filled.Place)
-    object Notes : Screen("notes/{dateId}", Icons.Filled.Home) {
-        fun createRoute(dateId: Long) = "notes/$dateId"
-    }
-    object AddNote : Screen("add-note/{dateId}?noteId={noteId}", Icons.Filled.Add) {
-        fun createRoute(dateId: Long, noteId: Long? = null) =
-            if (noteId != null) "add-note/$dateId?noteId=$noteId"
-            else "add-note/$dateId"
-    }
-}

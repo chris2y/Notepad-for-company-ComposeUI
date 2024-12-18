@@ -63,7 +63,8 @@ fun NotesScreen(
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "No notes added", style = MaterialTheme.typography.titleMedium)
+                Text(text = "No notes added",
+                    style = MaterialTheme.typography.headlineMedium)
             }
         } else {
             LazyColumn(

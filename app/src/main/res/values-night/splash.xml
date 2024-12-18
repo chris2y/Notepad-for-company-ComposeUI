@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Notepad.MySplash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#057886</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/company_logo_night</item>
+        <item name="postSplashScreenTheme">@style/Theme.NotepadForCompanyComposeUI</item>
+    </style>
+</resources>

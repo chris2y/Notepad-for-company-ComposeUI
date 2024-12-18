@@ -58,8 +58,8 @@ fun DateListScreen(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(16.dp),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    style = MaterialTheme.typography.bodyMedium
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineMedium
                 )
             } else {
                 Column {
