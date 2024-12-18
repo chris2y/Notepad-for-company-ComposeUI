@@ -2,11 +2,13 @@ package com.example.notepadforcompanycomposeui.screens
 
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.location.Location
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,6 +61,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 fun AddNoteScreen(
     dateId: Long,
     noteId: Long? = null,
@@ -211,9 +214,8 @@ fun AddNoteScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
+                .fillMaxSize()  // Ensure the Column occupies the whole screen
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
