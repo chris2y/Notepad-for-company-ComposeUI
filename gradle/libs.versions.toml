@@ -1,25 +1,25 @@
 [versions]
-agp = "8.6.1"
+agp = "8.7.3"
 coreSplashscreen = "1.0.1"
-hiltAndroid = "2.49"
-hiltAndroidCompiler = "2.44"
+hiltAndroid = "2.51.1"
+hiltAndroidCompiler = "2.51.1"
 hiltNavigationCompose = "1.2.0"
-kotlin = "1.9.0"
-coreKtx = "1.13.1"
+kotlin = "2.0.0"
+coreKtx = "1.15.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
-kotlinxCoroutinesAndroid = "1.7.3"
-lifecycleRuntimeKtx = "2.8.6"
+kotlinxCoroutinesAndroid = "1.9.0"
+lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
-composeBom = "2024.10.00"
-materialIconsExtended = "1.7.5"
-navigationCompose = "2.8.3"
+composeBom = "2024.12.01"
+materialIconsExtended = "1.7.6"
+navigationCompose = "2.8.5"
 osmdroidAndroid = "6.1.18"
 playServicesLocation = "21.3.0"
 roomCompiler = "2.6.1"
 preferenceKtx = "1.2.1"
-hilt = "2.49"
+hilt = "2.51.1"
 googleGmsGoogleServices = "4.4.2"
 firebaseFirestore = "25.1.1"
 
@@ -63,10 +63,12 @@ firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore
 
 [plugins]
 
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
 
 android-application = { id = "com.android.application", version.ref = "agp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
