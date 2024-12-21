@@ -8,7 +8,9 @@ Company Notepad is a powerful, open-source notepad app designed to help business
 <img src="" alt="Screenshot 3" width="300"/>
 <img src="" alt="Screenshot 3" width="300"/>
 <img src="" alt="Screenshot 3" width="300"/>
-[![Watch the video](https://img.youtube.com/vi/your_video_id/maxresdefault.jpg)](https://youtube.com/shorts/kWVxc1xvVQ0?feature=share)
+
+## 🎥 Demo Video
+[![Watch the video](https://img.youtube.com/vi/your_video_id/maxresdefault.jpg)](https://[youtube.com/shorts/kWVxc1xvVQ0](https://youtube.com/shorts/jWgrIxVN514)?feature=share)
 
 
 ## Key Features  
