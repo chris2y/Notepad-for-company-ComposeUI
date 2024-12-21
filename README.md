@@ -5,9 +5,11 @@ Company Notepad is a powerful, open-source notepad app designed to help business
 ---
 
 
-<img src="" alt="Screenshot 3" width="300"/>
-<img src="" alt="Screenshot 3" width="300"/>
-<img src="" alt="Screenshot 3" width="300"/>
+<img src="https://github.com/user-attachments/assets/733cb35b-7614-42f1-afb7-79d6c08758ea" alt="Screenshot 3" width="300"/>
+<img src="https://github.com/user-attachments/assets/b6312252-7d4b-4aeb-ab7a-ab2d66771676" alt="Screenshot 3" width="300"/>
+<img src="https://github.com/user-attachments/assets/e7e2b7b4-26a7-4cd4-9fab-a24c0628f69c" alt="Screenshot 3" width="300"/>
+<img src="https://github.com/user-attachments/assets/f467aa30-2af4-4946-b6d8-91a262e05487" alt="Screenshot 3" width="300"/>
+<img src="https://github.com/user-attachments/assets/75cbeed1-5e36-465f-b9fc-6e242ec70356" alt="Screenshot 3" width="300"/>
 
 ## 🎥 Demo Video  
 [![Watch the video](https://img.youtube.com/vi/jWgrIxVN514/maxresdefault.jpg)](https://www.youtube.com/shorts/jWgrIxVN514)
