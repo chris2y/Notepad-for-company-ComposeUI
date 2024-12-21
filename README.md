@@ -4,6 +4,13 @@ Company Notepad is a powerful, open-source notepad app designed to help business
 
 ---
 
+
+<img src="" alt="Screenshot 3" width="300"/>
+<img src="" alt="Screenshot 3" width="300"/>
+<img src="" alt="Screenshot 3" width="300"/>
+<video src="https://www.youtube.com/watch?v=k4RKr1Angik&ab_channel=AbyssiniaGamer" controls width="300"></video>
+
+
 ## Key Features  
 
 ### 1. Offline Data Management  
