@@ -18,6 +18,9 @@ data class NotesByDateEntity(
     var interestRate: String,
     var latitude: Double,
     var longitude: Double,
-    var isUploaded: Boolean
+    var isUploaded: Boolean,
+
+    // NEW FIELD
+    var localImagePath: String? = null
 
 )

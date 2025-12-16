@@ -1,5 +1,7 @@
 package com.example.notepadforcompanycomposeui.ViewModels
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.notepadforcompanycomposeui.data.entities.DateEntity
@@ -13,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -127,6 +131,25 @@ class NotesViewModel @Inject constructor(
 
     init {
         loadSavedDates()
+    }
+
+    fun saveImageToInternalStorage(context: Context, uri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            // Create a unique file name
+            val fileName = "img_${System.currentTimeMillis()}.jpg"
+            val file = File(context.filesDir, fileName)
+
+            inputStream?.use { input ->
+                FileOutputStream(file).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
 
