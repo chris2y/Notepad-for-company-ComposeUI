@@ -174,6 +174,7 @@ class LocationRepository @Inject constructor(
                 val additionalInfo = document.getString("additionalInfo") ?: ""
                 val followUp = document.getString("followUp") ?: ""
                 val interestRate = document.getString("interestRate") ?: ""
+                val imageUrl = document.getString("imageUrl") ?: ""
                 val latitude = document.getDouble("latitude") ?: 0.0
                 val longitude = document.getDouble("longitude") ?: 0.0
 
@@ -189,7 +190,9 @@ class LocationRepository @Inject constructor(
                     followUp = followUp,
                     interestRate = interestRate,
                     latitude = latitude,
-                    longitude = longitude
+                    longitude = longitude,
+                    imageUrl = imageUrl,
+
                 )
                 notes.add(note)
 

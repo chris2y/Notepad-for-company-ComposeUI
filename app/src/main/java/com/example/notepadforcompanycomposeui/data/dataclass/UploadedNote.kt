@@ -12,5 +12,6 @@ data class UploadedNote(
     val followUp: String,
     val interestRate: String,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val imageUrl: String
 )

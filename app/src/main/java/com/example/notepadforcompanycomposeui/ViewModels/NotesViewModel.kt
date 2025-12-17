@@ -1,6 +1,8 @@
 package com.example.notepadforcompanycomposeui.ViewModels
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,11 +12,15 @@ import com.example.notepadforcompanycomposeui.data.entities.NotesByDateEntity
 import com.example.notepadforcompanycomposeui.repository.NotesRepository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
@@ -152,6 +158,62 @@ class NotesViewModel @Inject constructor(
         }
     }
 
+    private suspend fun compressImage(filePath: String): ByteArray? {
+        return withContext(Dispatchers.IO) {
+            val file = File(filePath)
+            if (!file.exists()) return@withContext null
+
+            try {
+                // 1. Decode bounds to check size without loading whole image
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeFile(filePath, options)
+
+                // 2. Calculate scale factor (Resize to max 1080p roughly)
+                // This prevents loading a massive 12MP photo into memory
+                var inSampleSize = 1
+                val reqWidth = 1080
+                val reqHeight = 1080
+                val height = options.outHeight
+                val width = options.outWidth
+
+                if (height > reqHeight || width > reqWidth) {
+                    val halfHeight = height / 2
+                    val halfWidth = width / 2
+                    while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                        inSampleSize *= 2
+                    }
+                }
+
+                // 3. Load the actual image with the scale factor
+                options.inJustDecodeBounds = false
+                options.inSampleSize = inSampleSize
+                val bitmap = BitmapFactory.decodeFile(filePath, options)
+
+                // 4. Compress to WebP (or JPEG)
+                val outputStream = ByteArrayOutputStream()
+
+                // WEBP_LOSSY gives better size than JPEG.
+                // Quality 75 is a sweet spot for text/documents.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    bitmap?.compress(Bitmap.CompressFormat.WEBP_LOSSY, 75, outputStream)
+                } else {
+                    bitmap?.compress(Bitmap.CompressFormat.WEBP, 75, outputStream)
+                }
+
+                val byteArray = outputStream.toByteArray()
+                bitmap?.recycle() // Clean up memory
+                return@withContext byteArray
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return@withContext null
+            }
+        }
+    }
+
+
+    private val storage = FirebaseStorage.getInstance()
 
     private val firestore = FirebaseFirestore.getInstance()
     private val _uploadingNotes = MutableStateFlow<Set<Long>>(emptySet())
@@ -162,6 +224,23 @@ class NotesViewModel @Inject constructor(
             try {
                 // Add note ID to uploading set
                 _uploadingNotes.value = _uploadingNotes.value + note.noteId
+                var publicImageUrl = ""
+
+                if (!note.localImagePath.isNullOrEmpty()) {
+                    // --- CALL COMPRESSION HERE ---
+                    val compressedData = compressImage(note.localImagePath!!)
+
+                    if (compressedData != null) {
+                        val storageRef = storage.reference.child("note_images/${note.noteId}.webp") // Changed to .webp
+
+                        // --- UPLOAD BYTES INSTEAD OF FILE ---
+                        storageRef.putBytes(compressedData).await()
+
+                        publicImageUrl = storageRef.downloadUrl.await().toString()
+                    }
+                }
+
+
 
                 // Convert note to HashMap for Firestore
                 val noteMap = hashMapOf(
@@ -177,6 +256,7 @@ class NotesViewModel @Inject constructor(
                     "interestRate" to note.interestRate,
                     "latitude" to note.latitude,
                     "longitude" to note.longitude,
+                    "imageUrl" to publicImageUrl,
                     "timestamp" to FieldValue.serverTimestamp()
                 )
 

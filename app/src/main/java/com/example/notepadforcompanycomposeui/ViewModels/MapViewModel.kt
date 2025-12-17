@@ -60,6 +60,8 @@ class MapViewModel @Inject constructor(
         }
     }
 
+
+
     fun retryLocationFetch() {
         if (locationRetryCount < maxRetries) {
             locationRetryCount++

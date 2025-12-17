@@ -65,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.notepadforcompanycomposeui.R
 import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 
@@ -460,6 +461,15 @@ fun ShowNoteDetailsDialog(note: UploadedNote, onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(),
                     modifier = Modifier.padding(bottom = 16.dp)
+                )
+                AsyncImage(
+                    model = note.imageUrl,
+                    contentDescription = "Note Image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp) // import androidx.compose.foundation.layout.height
+                        .padding(bottom = 8.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
