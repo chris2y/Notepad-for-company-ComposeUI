@@ -1,10 +1,12 @@
 package com.example.notepadforcompanycomposeui.repository
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
 import android.os.Looper
 import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 import com.google.android.gms.location.*
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +20,7 @@ import org.osmdroid.tileprovider.cachemanager.CacheManager
 import org.osmdroid.views.MapView
 import java.io.File
 import javax.inject.Inject
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class LocationRepository @Inject constructor(
@@ -37,19 +40,22 @@ class LocationRepository @Inject constructor(
         cacheManager = CacheManager(mapView)
     }
 
+    /**
+     * IMPROVED: Streams location updates.
+     * Removed the strict 20m filter which blocks updates indoors.
+     */
+    @SuppressLint("MissingPermission") // Permissions are handled in UI
     fun getLocationUpdates(interval: Long): Flow<Location> = callbackFlow {
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
-            .setMinUpdateDistanceMeters(5f) // Minimum distance for updates
-            .setMinUpdateIntervalMillis(5000) // Minimum time between updates
-            .setMaxUpdateDelayMillis(interval) // Maximum time between updates
+            .setMinUpdateDistanceMeters(2f) // Lowered to detect small movements
+            .setMinUpdateIntervalMillis(interval / 2)
             .build()
 
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.locations.forEach { location ->
-                    if (location.accuracy <= 20f) { // Only accept locations with accuracy better than 20 meters
-                        trySend(location)
-                    }
+                // Return the most recent location available
+                result.lastLocation?.let { location ->
+                    trySend(location)
                 }
             }
         }
@@ -65,30 +71,33 @@ class LocationRepository @Inject constructor(
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    /**
+     * MAJOR FIX: Replaced complex manual logic with modern 'getCurrentLocation'.
+     * This API automatically handles "try cache, if old, get fresh".
+     */
+    @SuppressLint("MissingPermission")
     suspend fun getLastLocation(): Location = suspendCancellableCoroutine { continuation ->
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
-            .setMinUpdateIntervalMillis(2000)
-            .setMaxUpdateDelayMillis(5000)
-            .build()
+        // Cancellation token allows the coroutine to cancel the location request if the user leaves the screen
+        val cancellationTokenSource = CancellationTokenSource()
 
-        // First try to get the very last location
-        fusedLocationClient.lastLocation
-            .addOnSuccessListener { location ->
-                if (location != null && location.accuracy <= 20f) {
-                    continuation.resume(location, null)
-                } else {
-                    // If last location is null or inaccurate, request a fresh location
-                    requestFreshLocation(locationRequest) { newLocation ->
-                        continuation.resume(newLocation, null)
-                    }
-                }
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            cancellationTokenSource.token
+        ).addOnSuccessListener { location ->
+            if (location != null) {
+                continuation.resume(location)
+            } else {
+                // If location is null (services disabled/no fix), throw exception to stop loading spinner
+                continuation.resumeWithException(Exception("Location not found. Ensure GPS is on."))
             }
-            .addOnFailureListener {
-                requestFreshLocation(locationRequest) { newLocation ->
-                    continuation.resume(newLocation, null)
-                }
-            }
+        }.addOnFailureListener { exception ->
+            continuation.resumeWithException(exception)
+        }
+
+        // Clean up if the coroutine is cancelled
+        continuation.invokeOnCancellation {
+            cancellationTokenSource.cancel()
+        }
     }
 
     private fun requestFreshLocation(

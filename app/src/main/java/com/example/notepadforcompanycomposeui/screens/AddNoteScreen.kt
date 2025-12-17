@@ -2,6 +2,7 @@ package com.example.notepadforcompanycomposeui.screens
 
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.location.Location
 import android.net.Uri
@@ -63,6 +64,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+// Add these imports
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import com.example.notepadforcompanycomposeui.R // Import your R file for the icon
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +121,10 @@ fun AddNoteScreen(
     var currentImagePath by remember { mutableStateOf<String?>(null) } // Path from DB
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) } // Temporarily selected URI
 
+    var locationAccuracy by remember { mutableStateOf<Float?>(null) }
+
+
+
     // PHOTO PICKER LAUNCHER
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -113,22 +133,24 @@ fun AddNoteScreen(
         }
     )
 
-    // Function to start location updates
-    val startLocationUpdates = {
-        locationUpdateJob?.cancel()
-        locationUpdateJob = CoroutineScope(Dispatchers.Main).launch {
-            while (isActive) {
-                locationHandler.getCurrentLocation()?.let { location ->
-                    currentLocation = location
-                    showLocationRetryButton = false
-                } ?: run {
-                    showLocationRetryButton = true
-                }
-                delay(5000) // Update every 3 seconds
+    val startLocationUpdates = remember {
+        {
+            locationUpdateJob?.cancel()
+            locationUpdateJob = CoroutineScope(Dispatchers.Main).launch {
+                locationHandler.getLocationUpdates() // Use the new FLOW
+                    .collect { loc ->
+                        currentLocation = loc
+                        locationAccuracy = loc.accuracy // Get accuracy in meters
+                        showLocationRetryButton = false
+
+                        /*// Update the text field automatically if it's empty or looks like coordinates
+                        if (location.isEmpty() || location.contains("Lat:")) {
+                            location = "Lat: ${loc.latitude}, Lon: ${loc.longitude}"
+                        }*/
+                    }
             }
         }
     }
-
     // Function to handle GPS enable request
     val handleGPSEnable = {
         locationHandler.turnOnGPS(
@@ -192,7 +214,7 @@ fun AddNoteScreen(
                 currentLocation = Location("").apply {
                     latitude = note.latitude
                     longitude = note.longitude
-                    Toast.makeText(context, "${note.longitude + note.latitude}", Toast.LENGTH_SHORT).show()
+                   // Toast.makeText(context, "${note.longitude + note.latitude}", Toast.LENGTH_SHORT).show()
                 }
 
                 isUploaded = note.isUploaded
@@ -314,19 +336,18 @@ fun AddNoteScreen(
                 onValueChange = { location = it },
                 label = { Text("Location*") },
                 modifier = Modifier.fillMaxWidth(),
-                isError = showErrors && location.isEmpty()
-            )
+                isError = showErrors && location.isEmpty(),
 
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = { phoneNumber = it },
-                label = { Text("Phone Number") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Number
-                ),
-                isError = showErrors && phoneNumber.isEmpty()
             )
+            // Show Accuracy Text
+            if (currentLocation != null && noteId == null) {
+                Text(
+                    text = "GPS Accuracy: ±${locationAccuracy?.toInt() ?: "?"} meters",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if ((locationAccuracy ?: 100f) < 20) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+            }
+
 
 
             // --- 1. IMAGE PREVIEW SECTION ---
@@ -358,6 +379,8 @@ fun AddNoteScreen(
                 }
             }
 
+
+
             // --- 2. ADD IMAGE BUTTON ---
             Button(
                 onClick = {
@@ -372,6 +395,38 @@ fun AddNoteScreen(
                 Text("Add Image")
             }
 
+            val latToShow = currentLocation?.latitude
+            val lonToShow = currentLocation?.longitude
+
+            // Show map if we have valid coordinates (from GPS or DB)
+            if (latToShow != null && lonToShow != null && latToShow != 0.0) {
+                Text(
+                    text = "Location Preview",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
+                MiniMapPreview(
+                    latitude = latToShow,
+                    longitude = lonToShow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp) // Small height for preview
+                        .padding(bottom = 8.dp)
+                )
+            } else {
+                // Optional: Placeholder if no location yet
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Fetching Location...", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -379,6 +434,15 @@ fun AddNoteScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it },
+                label = { Text("Phone Number") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    keyboardType = KeyboardType.Number
+                ),
+            )
 
 
             OutlinedTextField(
@@ -414,7 +478,6 @@ fun AddNoteScreen(
             // Inside AddNoteScreen, modify the Button's onClick:
 
 
-
             Button(
                 onClick = {
                     if (companyName.isEmpty() || location.isEmpty()) {
@@ -441,7 +504,7 @@ fun AddNoteScreen(
                             interestRate = interestRate,
                             latitude = currentLocation?.latitude ?: 0.0,
                             longitude = currentLocation?.longitude ?: 0.0,
-                            isUploaded = isUploaded,
+                            isUploaded = false,
                             localImagePath = finalImagePath
                         )
 
@@ -469,4 +532,54 @@ fun AddNoteScreen(
             }
         }
     }
+}
+
+
+@SuppressLint("RememberReturnType")
+@Composable
+fun MiniMapPreview(
+    latitude: Double,
+    longitude: Double,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    // Initialize OSM configuration
+    remember {
+        Configuration.getInstance().load(
+            context,
+            androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+        )
+    }
+
+    val geoPoint = remember(latitude, longitude) { GeoPoint(latitude, longitude) }
+
+    AndroidView(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+        factory = { ctx ->
+            MapView(ctx).apply {
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true) // Allow user to zoom in/out if they want
+                controller.setZoom(17.0)
+                // Disable scrolling to prevent it from eating scroll events of the column
+                // setBuiltInZoomControls(false)
+            }
+        },
+        update = { mapView ->
+            mapView.controller.setCenter(geoPoint)
+
+            mapView.overlays.clear()
+            val marker = Marker(mapView).apply {
+                position = geoPoint
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = "Selected Location"
+                // Use your custom icon or a default one
+                icon = AppCompatResources.getDrawable(context, R.drawable.my_location)
+            }
+            mapView.overlays.add(marker)
+            mapView.invalidate()
+        }
+    )
 }

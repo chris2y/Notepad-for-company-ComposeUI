@@ -58,8 +58,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
@@ -73,7 +77,7 @@ import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val userLocation = viewModel.userLocation.collectAsState().value
+    val userLocation by viewModel.userLocation.collectAsState() // Use 'by' for direct access
     val locationError = viewModel.locationError.collectAsState().value
     val isLoading = viewModel.isLoading.collectAsState().value
     val isDarkTheme = isSystemInDarkTheme()
@@ -90,11 +94,12 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
 
 
 
-    // Initialize map configuration
-    Configuration.getInstance().load(
-        context,
-        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
-    )
+    // 1. OPTIMIZATION: Increase cache size for smoother panning
+    Configuration.getInstance().apply {
+        load(context, androidx.preference.PreferenceManager.getDefaultSharedPreferences(context))
+        cacheMapTileCount = 30.toShort() // Cache more tiles in memory (default is 9)
+        cacheMapTileOvershoot = 30.toShort() // Pre-load tiles just outside the screen
+    }
 
 
     class InvertedTilesOverlay(mapView: MapView, context: Context) : TilesOverlay(mapView.tileProvider, context) {
@@ -215,8 +220,69 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         }
     }
 
+    // 2. OPTIMIZATION: Fast Dark Mode (No pixel loops!)
+    class FastDarkModeOverlay(mapView: MapView) : TilesOverlay(mapView.tileProvider, context) {
+        init {
+            // Use a simple high-contrast ColorMatrix for dark mode
+            // This runs on the GPU and is ZERO lag compared to manual pixel manipulation
+            val matrix = ColorMatrix()
+            matrix.setSaturation(0f) // Remove color (grayscale)
+
+            // Invert colors (Make white roads dark, black text white)
+            val invert = floatArrayOf(
+                -1f,  0f,  0f, 0f, 255f,
+                0f, -1f,  0f, 0f, 255f,
+                0f,  0f, -1f, 0f, 255f,
+                0f,  0f,  0f, 1f,   0f
+            )
+            matrix.postConcat(ColorMatrix(invert))
+
+            // Darken everything slightly so it's not too harsh
+            val darken = ColorMatrix()
+            darken.setScale(0.8f, 0.8f, 0.8f, 1f)
+            matrix.postConcat(darken)
+
+            setColorFilter(ColorMatrixColorFilter(matrix))
+        }
+    }
 
     val mapView = remember {
+        MapView(context).apply {
+            // 3. DETAIL SETTINGS
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+
+            // --- FIX FOR MULTIPLE WORLDS ---
+            // 1. Disable the wrapping/repeating of the map
+            isHorizontalMapRepetitionEnabled = false
+            isVerticalMapRepetitionEnabled = false
+
+            // 2. Limit scrolling so the user can't scroll into the gray void
+            setScrollableAreaLimitLatitude(
+                MapView.getTileSystem().maxLatitude,
+                MapView.getTileSystem().minLatitude,
+                0
+            )
+            setScrollableAreaLimitLongitude(
+                -180.0,
+                180.0,
+                0
+            )
+
+            // 3. Prevent zooming out too far (optional, keeps map filling the screen)
+            minZoomLevel = 3.0
+            maxZoomLevel = 20.0
+
+            // Text scaling
+            isTilesScaledToDpi = true
+
+            // 4. PERFORMANCE SETTINGS
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            setHasTransientState(true)
+        }
+    }
+
+    /*val mapView = remember {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
@@ -235,21 +301,38 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
             controller.setCenter(GeoPoint(lastCenterLat, lastCenterLon))
             controller.setZoom(lastZoomLevel)
         }
+    }*/
+
+    // 1. UPDATE LIFECYCLE OBSERVER
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    mapView.onResume()
+                    // Start tracking real-time location
+                    viewModel.startLocationUpdates()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    mapView.onPause()
+                    // Stop tracking to save battery
+                    viewModel.stopLocationUpdates()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopLocationUpdates()
+        }
     }
 
+    // Apply Theme Changes
     LaunchedEffect(isDarkTheme) {
-        if (isDarkTheme) {
-            // Apply dark theme
-            val darkTilesOverlay = InvertedTilesOverlay(mapView, context)
-            darkTilesOverlay.loadingBackgroundColor = android.graphics.Color.BLACK
-            darkTilesOverlay.loadingLineColor = android.graphics.Color.rgb(180, 180, 180)
-            mapView.overlayManager.tilesOverlay = darkTilesOverlay
+        mapView.overlayManager.tilesOverlay = if (isDarkTheme) {
+            FastDarkModeOverlay(mapView)
         } else {
-            // Reset to default theme
-            val defaultTilesOverlay = TilesOverlay(mapView.tileProvider, context)
-            defaultTilesOverlay.loadingBackgroundColor = android.graphics.Color.rgb(238, 238, 238)
-            defaultTilesOverlay.loadingLineColor = android.graphics.Color.rgb(100, 100, 100)
-            mapView.overlayManager.tilesOverlay = defaultTilesOverlay
+            TilesOverlay(mapView.tileProvider, context)
         }
         mapView.invalidate()
     }
@@ -341,6 +424,8 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         viewModel.getUploadedNotes()
     }
 
+    var userMarker by remember { mutableStateOf<Marker?>(null) }
+
     AndroidView(
         factory = { mapView },
         modifier = Modifier.fillMaxSize()
@@ -362,45 +447,56 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
             }
         }*/
 
-        // Only zoom to user location if it's the first time and we have a location
-        if (!hasZoomedToUser && userLocation != null) {
-            userLocation.let { location ->
-                mv.controller.apply {
-                    setZoom(14.0)
-                    setCenter(location)
-                }
-                hasZoomedToUser = true
-                lastZoomLevel = 6.0
-                lastCenterLat = location.latitude
-                lastCenterLon = location.longitude
-            }
-        }
 
-        // Always update the location marker
+// Update User Location Marker Logic
         if (userLocation != null) {
-            //mv.overlays.clear()
-            Marker(mv).apply {
-                position = userLocation
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                title = "Your location"
-                icon = context.getDrawable(R.drawable.my_location)
-                if (isDarkTheme) {
-                    // Tint the marker icon for dark mode
-                    //icon?.setTint(android.graphics.Color.WHITE)
+            if (userMarker == null) {
+                // Create the marker ONLY once
+                userMarker = Marker(mv).apply {
+                    title = "Your location"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    icon = AppCompatResources.getDrawable(context, R.drawable.my_location) // Ensure you have this drawable
+                    // Prevent this marker from being cleared when other notes update
+                    id = "MY_LOCATION_MARKER"
                 }
-                mv.overlays.add(this)
+                mv.overlays.add(userMarker)
             }
+
+            // Just update the position of the existing marker
+            userMarker?.position = userLocation
+            userMarker?.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+
+            // Force redraw
+            mv.invalidate()
         }
 
-        mv.setScrollableAreaLimitDouble(
-            BoundingBox(
-                85.0,  // North
-                180.0, // East
-                -85.0, // South
-                -180.0 // West
-            )
-        )
+        // Zoom logic (First time only)
+        if (!hasZoomedToUser && userLocation != null) {
+            userLocation?.let { location ->
+                mv.controller.animateTo(location, 15.0, 1000L) // animated for smooth look
+                hasZoomedToUser = true
+            }
+        }
     }
+
+
+    // 3. ADD A "RE-CENTER" BUTTON (Optional but recommended)
+    Box(modifier = Modifier.fillMaxSize()) {
+        FloatingActionButton(
+            onClick = {
+                userLocation?.let {
+                    mapView.controller.animateTo(it, 16.0, 1000L)
+                } ?: viewModel.startLocationUpdates() // Retry if null
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .padding(bottom = 70.dp) // Adjust based on your Nav bar
+        ) {
+            Icon(Icons.Default.MyLocation, contentDescription = "Center Map")
+        }
+    }
+
 
     selectedNote?.let { note ->
         ShowNoteDetailsDialog(note) {

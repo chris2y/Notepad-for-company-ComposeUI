@@ -6,12 +6,15 @@ import com.example.notepadforcompanycomposeui.data.dataclass.UploadedNote
 import com.example.notepadforcompanycomposeui.data.entities.FirebaseEntity
 import com.example.notepadforcompanycomposeui.repository.LocationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
+
 // MapViewModel.kt
 @HiltViewModel
 class MapViewModel @Inject constructor(
@@ -59,8 +62,46 @@ class MapViewModel @Inject constructor(
             }
         }
     }
+    private var locationJob: Job? = null
 
 
+
+
+    fun startLocationUpdates() {
+        // Cancel existing job if any to avoid duplicates
+        locationJob?.cancel()
+
+        locationJob = viewModelScope.launch {
+            _isLoading.value = true
+            // Clear any previous errors immediately when starting
+            _locationError.value = null
+
+            try {
+                locationRepository.getLocationUpdates(5000L)
+                    .collect { location ->
+                        _userLocation.value = GeoPoint(location.latitude, location.longitude)
+                        _isLoading.value = false
+                        _locationError.value = null
+                    }
+            } catch (e: Exception) {
+                // FIX: Check if the error is just a normal cancellation
+                if (e is CancellationException) {
+                    // Do nothing, this is normal behavior when leaving the screen
+                    throw e
+                }
+                // Only show error dialog for actual failures
+                handleLocationError(e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+
+    // CHANGE 2: Call this when screen disappears to save battery
+    fun stopLocationUpdates() {
+        locationJob?.cancel()
+    }
 
     fun retryLocationFetch() {
         if (locationRetryCount < maxRetries) {
