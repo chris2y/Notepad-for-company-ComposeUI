@@ -77,6 +77,7 @@ import androidx.compose.ui.draw.clip
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.Lock
 import com.example.notepadforcompanycomposeui.R // Import your R file for the icon
 
 
@@ -122,6 +123,8 @@ fun AddNoteScreen(
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) } // Temporarily selected URI
 
     var locationAccuracy by remember { mutableStateOf<Float?>(null) }
+
+    val isEditMode = noteId != null
 
 
 
@@ -234,7 +237,7 @@ fun AddNoteScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add New Note") },
+                title = { Text(if(isEditMode) "Edit Note" else "Add New Note") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -338,9 +341,10 @@ fun AddNoteScreen(
                 modifier = Modifier.fillMaxWidth(),
                 isError = showErrors && location.isEmpty(),
 
-            )
-            // Show Accuracy Text
-            if (currentLocation != null && noteId == null) {
+                )
+
+            // Only show accuracy for new notes
+            if (currentLocation != null && !isEditMode) {
                 Text(
                     text = "GPS Accuracy: ±${locationAccuracy?.toInt() ?: "?"} meters",
                     style = MaterialTheme.typography.bodySmall,
@@ -482,15 +486,13 @@ fun AddNoteScreen(
                 onClick = {
                     if (companyName.isEmpty() || location.isEmpty()) {
                         showErrors = true
-                    }
-                    else {
-                        // 1. DETERMINE FINAL IMAGE PATH
+                    } else {
                         var finalImagePath = currentImagePath
-
-                        // If user selected a NEW image, save it to internal storage now
                         if (selectedImageUri != null) {
                             finalImagePath = viewModel.saveImageToInternalStorage(context, selectedImageUri!!)
                         }
+
+                        // --- LOGIC CHANGE 4: PRESERVE LOCATION IN UPDATE ---
                         val note = NotesByDateEntity(
                             noteId = noteId ?: System.currentTimeMillis(),
                             dateId = dateId,
@@ -498,12 +500,18 @@ fun AddNoteScreen(
                             phoneNumber = phoneNumber,
                             companyName = companyName,
                             email = email,
+                            // If editing, 'location' string is already loaded from DB and wasn't changed
                             location = location,
                             additionalInfo = additionalInfo,
                             followUp = followUp,
                             interestRate = interestRate,
+
+                            // If editing, currentLocation holds the DB value.
+                            // If adding, it holds GPS value.
+                            // This works because we stopped GPS updates in Edit mode.
                             latitude = currentLocation?.latitude ?: 0.0,
                             longitude = currentLocation?.longitude ?: 0.0,
+
                             isUploaded = false,
                             localImagePath = finalImagePath
                         )
@@ -512,16 +520,13 @@ fun AddNoteScreen(
                             viewModel.updateNote(note)
                             onNavigateBack()
                         } else {
-                            if(!isGPSEnabled){
-                                Toast.makeText(context,"Location not found",Toast.LENGTH_SHORT).show()
-                            }
-                            else{
+                            if (!isGPSEnabled) {
+                                Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
+                            } else {
                                 viewModel.insertNote(note)
                                 onNavigateBack()
                             }
-
                         }
-
                     }
                 },
                 modifier = Modifier
@@ -532,6 +537,7 @@ fun AddNoteScreen(
             }
         }
     }
+
 }
 
 
